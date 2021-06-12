@@ -9,6 +9,9 @@ version:        0.0.0
 build-type:     Simple
 
 library
+  exposed-modules:
+      Core
+      Docker
   other-modules:
       Paths_quad
   hs-source-dirs:
@@ -102,7 +105,7 @@ test-suite quad-test
     , base
     , butcher
     , hslogger
-    , hspect
+    , hspec
     , http-client
     , http-conduit
     , http-types
