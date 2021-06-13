@@ -7,6 +7,11 @@ import qualified Network.HTTP.Simple as HTTP
 import RIO
 import qualified Socket
 
+data Service = Service
+  { createContainer :: CreateContainerOptions -> IO ContainerId,
+    startContainer :: ContainerId -> IO ()
+  }
+
 data CreateContainerOptions = CreateContainerOptions
   { image :: Image
   }
@@ -27,8 +32,16 @@ exitCodeToInt (ContainerExitCode code) = code
 imageToText :: Docker.Image -> Text
 imageToText (Docker.Image image) = image
 
-createContainer :: CreateContainerOptions -> IO ContainerId
-createContainer options = do
+createService :: IO Service
+createService = do
+  pure
+    Service
+      { createContainer = createContainer',
+        startContainer = startContainer'
+      }
+
+createContainer' :: CreateContainerOptions -> IO ContainerId
+createContainer' options = do
   manager <- Socket.newManager "/var/run/docker.sock"
   let image = imageToText options.image
       body =
@@ -51,8 +64,8 @@ createContainer options = do
   res <- HTTP.httpBS req
   parseResponse res parser
 
-startContainer :: ContainerId -> IO ()
-startContainer container = do
+startContainer' :: ContainerId -> IO ()
+startContainer' container = do
   manager <- Socket.newManager "/var/run/docker.sock"
 
   let path = "/v1.40/containers/" <> containerIdToText container <> "/start"

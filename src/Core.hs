@@ -45,7 +45,7 @@ exitCodeToStepResult exit =
     else StepFailed exit
 
 data BuildResult
-  = BuildSucceed
+  = BuildSucceeded
   | BuildFailed
   deriving (Eq, Show)
 
@@ -54,16 +54,16 @@ newtype StepName = StepName Text deriving (Eq, Show, Ord)
 stepNameToText :: StepName -> Text
 stepNameToText (StepName step) = step
 
-progress :: Build -> IO Build
-progress build =
+progress :: Docker.Service -> Build -> IO Build
+progress docker build =
   case build.state of
     BuildReady -> case buildHasNextStep build of
       Left result -> pure $ build {state = BuildFinished result}
       Right step -> do
         let options = Docker.CreateContainerOptions step.image
             s = BuildRunningState {step = step.name}
-        container <- Docker.createContainer options
-        Docker.startContainer container
+        container <- docker.createContainer options
+        docker.startContainer container
         pure $ build {state = BuildRunning s}
     BuildRunning state -> do
       let exit = Docker.ContainerExitCode 0
@@ -80,7 +80,7 @@ buildHasNextStep build =
   if allSucceed
     then case nextStep of
       Just step -> Right step
-      Nothing -> Left BuildSucceed
+      Nothing -> Left BuildSucceeded
     else Left BuildFailed
   where
     allSucceed = List.all (StepSucceeded ==) build.completedSteps
