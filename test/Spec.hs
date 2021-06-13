@@ -60,4 +60,4 @@ main = hspec do
 
 cleanupDocker :: IO ()
 cleanupDocker = void do
-  Process.readProcessStdout "docker rm -f $(docker ps -aq --filter \"label=quad\""
+  Process.readProcessStdout "docker rm -f $(docker ps -aq --filter \"label=quad\")"
