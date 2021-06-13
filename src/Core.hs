@@ -54,16 +54,16 @@ newtype StepName = StepName Text deriving (Eq, Show, Ord)
 stepNameToText :: StepName -> Text
 stepNameToText (StepName step) = step
 
-imageToText :: Docker.Image -> Text
-imageToText (Docker.Image image) = image
-
 progress :: Build -> IO Build
 progress build =
   case build.state of
     BuildReady -> case buildHasNextStep build of
       Left result -> pure $ build {state = BuildFinished result}
       Right step -> do
-        let s = BuildRunningState {step = step.name}
+        let options = Docker.CreateContainerOptions step.image
+            s = BuildRunningState {step = step.name}
+        container <- Docker.createContainer options
+        Docker.startContainer container
         pure $ build {state = BuildRunning s}
     BuildRunning state -> do
       let exit = Docker.ContainerExitCode 0
