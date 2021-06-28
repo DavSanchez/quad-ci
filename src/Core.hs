@@ -30,7 +30,7 @@ data BuildState
   | BuildFinished BuildResult
   deriving (Eq, Show)
 
-data BuildRunningState = BuildRunningState {step :: StepName}
+data BuildRunningState = BuildRunningState {step :: StepName, container :: Docker.ContainerId}
   deriving (Eq, Show)
 
 data StepResult
@@ -47,6 +47,7 @@ exitCodeToStepResult exit =
 data BuildResult
   = BuildSucceeded
   | BuildFailed
+  | BuildUnexpectedState Text
   deriving (Eq, Show)
 
 newtype StepName = StepName Text deriving (Eq, Show, Ord)
@@ -61,18 +62,24 @@ progress docker build =
       Left result -> pure $ build {state = BuildFinished result}
       Right step -> do
         let options = Docker.CreateContainerOptions step.image
-            s = BuildRunningState {step = step.name}
         container <- docker.createContainer options
+        let s = BuildRunningState {step = step.name, container = container}
         docker.startContainer container
         pure $ build {state = BuildRunning s}
     BuildRunning state -> do
-      let exit = Docker.ContainerExitCode 0
-          result = exitCodeToStepResult exit
-      pure
-        build
-          { state = BuildReady,
-            completedSteps = Map.insert state.step result build.completedSteps
-          }
+      status <- docker.containerStatus state.container
+      case status of
+        Docker.ContainerRunning -> pure build -- If it's running, we'll wait for it to exit.
+        Docker.ContainerExited exit -> do
+          let result = exitCodeToStepResult exit
+          pure
+            build
+              { state = BuildReady,
+                completedSteps = Map.insert state.step result build.completedSteps
+              }
+        Docker.ContainerOther other -> do -- TODO handle error
+          let s = BuildUnexpectedState other
+          pure build { state = BuildFinished s }
     BuildFinished _ -> pure build
 
 buildHasNextStep :: Build -> Either BuildResult Step

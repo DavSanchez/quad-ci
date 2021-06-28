@@ -9,12 +9,16 @@ import qualified Socket
 
 data Service = Service
   { createContainer :: CreateContainerOptions -> IO ContainerId,
-    startContainer :: ContainerId -> IO ()
+    startContainer :: ContainerId -> IO (),
+    containerStatus :: ContainerId -> IO ContainerStatus
   }
 
 data CreateContainerOptions = CreateContainerOptions
   { image :: Image
   }
+
+data ContainerStatus = ContainerRunning | ContainerExited ContainerExitCode | ContainerOther Text
+  deriving (Eq, Show)
 
 newtype Image = Image Text deriving (Eq, Show)
 
@@ -22,6 +26,8 @@ newtype ContainerExitCode = ContainerExitCode Int deriving (Eq, Show)
 
 newtype ContainerId = ContainerId Text
   deriving (Eq, Show)
+
+type RequestBuilder = Text -> HTTP.Request
 
 containerIdToText :: ContainerId -> Text
 containerIdToText (ContainerId c) = c
@@ -34,14 +40,22 @@ imageToText (Docker.Image image) = image
 
 createService :: IO Service
 createService = do
+  -- Init manager once
+  manager <- Socket.newManager "/var/run/docker.sock"
+
+  -- Make Request
+  let makeReq :: RequestBuilder
+      makeReq path = HTTP.defaultRequest & HTTP.setRequestPath (encodeUtf8 $ "/v1.41" <> path) & HTTP.setRequestManager manager
+
   pure
     Service
-      { createContainer = createContainer',
-        startContainer = startContainer'
+      { createContainer = createContainer' makeReq,
+        startContainer = startContainer' makeReq,
+        containerStatus = undefined -- tODO
       }
 
-createContainer' :: CreateContainerOptions -> IO ContainerId
-createContainer' options = do
+createContainer' :: RequestBuilder -> CreateContainerOptions -> IO ContainerId
+createContainer' makeReq options = do
   manager <- Socket.newManager "/var/run/docker.sock"
   let image = imageToText options.image
       body =
@@ -53,9 +67,7 @@ createContainer' options = do
             ("Cmd", "echo hello")
           ]
       req =
-        HTTP.defaultRequest
-          & HTTP.setRequestManager manager
-          & HTTP.setRequestPath "/v1.40/containers/create"
+        makeReq "/containers/create"
           & HTTP.setRequestMethod "POST"
           & HTTP.setRequestBodyJSON body
       parser = Aeson.withObject "create-container" $ \o -> do
@@ -64,17 +76,10 @@ createContainer' options = do
   res <- HTTP.httpBS req
   parseResponse res parser
 
-startContainer' :: ContainerId -> IO ()
-startContainer' container = do
-  manager <- Socket.newManager "/var/run/docker.sock"
-
-  let path = "/v1.40/containers/" <> containerIdToText container <> "/start"
-      req =
-        HTTP.defaultRequest
-          & HTTP.setRequestManager manager
-          & HTTP.setRequestPath (encodeUtf8 path)
-          & HTTP.setRequestMethod "POST"
-
+startContainer' :: RequestBuilder -> ContainerId -> IO ()
+startContainer' makeReq container = do
+  let path = "/containers/" <> containerIdToText container <> "/start"
+      req = makeReq path & HTTP.setRequestMethod "POST"
   void $ HTTP.httpBS req
 
 parseResponse :: HTTP.Response ByteString -> (Aeson.Value -> Aeson.Types.Parser a) -> IO a
@@ -82,7 +87,6 @@ parseResponse res parser = do
   let result = do
         value <- Aeson.eitherDecodeStrict (HTTP.getResponseBody res)
         Aeson.Types.parseEither parser value
-
   case result of
     Left e -> throwString e
     Right status -> pure status

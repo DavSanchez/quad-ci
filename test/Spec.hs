@@ -5,6 +5,7 @@ import qualified Docker
 import RIO
 import qualified RIO.Map as Map
 import qualified RIO.NonEmpty.Partial as NonEmpty.Partial
+import qualified Runner
 import qualified System.Process.Typed as Process
 import Test.Hspec
 
@@ -36,11 +37,24 @@ testBuild =
       completedSteps = mempty
     }
 
-testRunSuccess :: Docker.Service -> IO ()
-testRunSuccess docker = do
-  result <- runBuild docker testBuild
+testRunSuccess :: Runner.Service -> IO ()
+testRunSuccess runner = do
+  build <-
+    runner.prepareBuild $
+      makePipeline
+        [ makeStep "First step" "ubuntu" ["date"],
+          makeStep "Second step" "ubuntu" ["uname -r"]
+        ]
+  result <- runner.runBuild build
   result.state `shouldBe` BuildFinished BuildSucceeded
   Map.elems result.completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
+
+testRunFailure :: Runner.Service -> IO ()
+testRunFailure runner = do
+  build <- runner.prepareBuild $ makePipeline [makeStep "Should fail" "ubuntu" ["exit 1"]]
+  result <- runner.runBuild build
+  result.state `shouldBe` BuildFinished BuildFailed
+  Map.elems result.completedSteps `shouldBe` [StepFailed (Docker.ContainerExitCode 1)]
 
 runBuild :: Docker.Service -> Build -> IO Build
 runBuild docker build = do
@@ -54,9 +68,12 @@ runBuild docker build = do
 main :: IO ()
 main = hspec do
   docker <- runIO Docker.createService
+  runner <- runIO $ Runner.createService docker
   beforeAll cleanupDocker $ describe "QuadCI" do
     it "should run a build (success)" do
-      testRunSuccess docker
+      testRunSuccess runner
+    it "should run a build (failure)" do
+      testRunFailure runner
 
 cleanupDocker :: IO ()
 cleanupDocker = void do
