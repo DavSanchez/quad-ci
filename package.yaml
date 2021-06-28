@@ -30,7 +30,7 @@ dependencies:
   - yaml
 
 ghc-options:
-  - -F -pgmF=record-dot-preprocessor
+  - -F -pgmF=record-dot-preprocessor -haddock
 
 library:
   source-dirs: src

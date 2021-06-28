@@ -29,13 +29,13 @@ testPipeline =
       makeStep "Second step" "ubuntu" ["uname -r"]
     ]
 
-testBuild :: Build
-testBuild =
-  Build
-    { pipeline = testPipeline,
-      state = BuildReady,
-      completedSteps = mempty
-    }
+-- testBuild :: Build
+-- testBuild =
+--   Build
+--     { pipeline = testPipeline,
+--       state = BuildReady,
+--       completedSteps = mempty,
+--     }
 
 testRunSuccess :: Runner.Service -> IO ()
 testRunSuccess runner = do
@@ -56,6 +56,18 @@ testRunFailure runner = do
   result.state `shouldBe` BuildFinished BuildFailed
   Map.elems result.completedSteps `shouldBe` [StepFailed (Docker.ContainerExitCode 1)]
 
+testSharedWorkspace :: Runner.Service -> IO ()
+testSharedWorkspace runner = do
+  build <-
+    runner.prepareBuild $
+      makePipeline
+        [ makeStep "First step" "ubuntu" ["echo hello > test"],
+          makeStep "Second step" "ubuntu" ["cat test"]
+        ]
+  result <- runner.runBuild build
+  result.state `shouldBe` BuildFinished BuildSucceeded
+  Map.elems result.completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
+
 runBuild :: Docker.Service -> Build -> IO Build
 runBuild docker build = do
   newBuild <- Core.progress docker build
@@ -74,7 +86,10 @@ main = hspec do
       testRunSuccess runner
     it "should run a build (failure)" do
       testRunFailure runner
+    it "should share workspace between steps" do
+      testSharedWorkspace runner
 
 cleanupDocker :: IO ()
 cleanupDocker = void do
   Process.readProcessStdout "docker rm -f $(docker ps -aq --filter \"label=quad\")"
+  Process.readProcessStdout "docker volume rm -f $(docker volume ls -q --filter \"label=quad\")"

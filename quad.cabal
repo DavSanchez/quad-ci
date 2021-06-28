@@ -26,7 +26,7 @@ library
       NoImplicitPrelude
       OverloadedStrings
       StrictData
-  ghc-options: -F -pgmF=record-dot-preprocessor
+  ghc-options: -F -pgmF=record-dot-preprocessor -haddock
   build-depends:
       aeson
     , async
@@ -62,7 +62,7 @@ executable quad
       NoImplicitPrelude
       OverloadedStrings
       StrictData
-  ghc-options: -F -pgmF=record-dot-preprocessor -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -F -pgmF=record-dot-preprocessor -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , async
@@ -100,7 +100,7 @@ test-suite quad-test
       NoImplicitPrelude
       OverloadedStrings
       StrictData
-  ghc-options: -F -pgmF=record-dot-preprocessor -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -F -pgmF=record-dot-preprocessor -haddock -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , async

@@ -1,3 +1,5 @@
 resolver: lts-17.15
 packages: [.]
 system-ghc: true
+ghc-options:
+  "$everything": -haddock

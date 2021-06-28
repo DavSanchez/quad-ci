@@ -4,6 +4,8 @@ import qualified Docker
 import RIO
 import qualified RIO.List as List
 import qualified RIO.Map as Map
+import qualified RIO.NonEmpty as NonEmpty
+import qualified RIO.Text as Text
 
 data Pipeline = Pipeline
   { steps :: NonEmpty Step
@@ -20,7 +22,8 @@ data Step = Step
 data Build = Build
   { pipeline :: Pipeline,
     state :: BuildState,
-    completedSteps :: Map StepName StepResult
+    completedSteps :: Map StepName StepResult,
+    volume :: Docker.Volume
   }
   deriving (Eq, Show)
 
@@ -61,11 +64,24 @@ progress docker build =
     BuildReady -> case buildHasNextStep build of
       Left result -> pure $ build {state = BuildFinished result}
       Right step -> do
-        let options = Docker.CreateContainerOptions step.image
+        let script = Text.unlines $ ["set -ex"] <> NonEmpty.toList step.commands
+        let options =
+              Docker.CreateContainerOptions
+                { image = step.image,
+                  script = script,
+                  volume = build.volume
+                }
         container <- docker.createContainer options
-        let s = BuildRunningState {step = step.name, container = container}
+        let s =
+              BuildRunningState
+                { step = step.name,
+                  container = container
+                }
         docker.startContainer container
-        pure $ build {state = BuildRunning s}
+        pure $
+          build
+            { state = BuildRunning s
+            }
     BuildRunning state -> do
       status <- docker.containerStatus state.container
       case status of
@@ -77,9 +93,10 @@ progress docker build =
               { state = BuildReady,
                 completedSteps = Map.insert state.step result build.completedSteps
               }
-        Docker.ContainerOther other -> do -- TODO handle error
+        Docker.ContainerOther other -> do
+          -- TODO handle error
           let s = BuildUnexpectedState other
-          pure build { state = BuildFinished s }
+          pure build {state = BuildFinished s}
     BuildFinished _ -> pure build
 
 buildHasNextStep :: Build -> Either BuildResult Step
