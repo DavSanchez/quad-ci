@@ -3,15 +3,23 @@ module Docker where
 import Data.Aeson
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson.Types
+import qualified Data.Time.Clock.POSIX as Time
 import qualified Network.HTTP.Simple as HTTP
 import RIO
 import qualified Socket
+
+data FetchLogsOptions = FetchLogsOptions
+  { container :: ContainerId,
+    since :: Time.POSIXTime,
+    until :: Time.POSIXTime
+  }
 
 data Service = Service
   { createContainer :: CreateContainerOptions -> IO ContainerId,
     startContainer :: ContainerId -> IO (),
     containerStatus :: ContainerId -> IO ContainerStatus,
-    createVolume :: IO Volume
+    createVolume :: IO Volume,
+    fetchLogs :: FetchLogsOptions -> IO ByteString
   }
 
 data CreateContainerOptions = CreateContainerOptions
@@ -60,7 +68,8 @@ createService = do
       { createContainer = createContainer' makeReq,
         startContainer = startContainer' makeReq,
         containerStatus = containerStatus' makeReq,
-        createVolume = createVolume' makeReq
+        createVolume = createVolume' makeReq,
+        fetchLogs = fetchLogs' makeReq
       }
 
 createContainer' :: RequestBuilder -> CreateContainerOptions -> IO ContainerId
@@ -119,6 +128,19 @@ createVolume' makeReq = do
         pure $ Volume name
   res <- HTTP.httpBS req
   parseResponse res parser
+
+fetchLogs' :: RequestBuilder -> FetchLogsOptions -> IO ByteString
+fetchLogs' makeReq options = do
+  let timestampToText t = tshow (round t :: Int)
+  let url =
+        "/containers/"
+          <> containerIdToText options.container
+          <> "/logs?stdout=true&stderr=true&since="
+          <> timestampToText options.since
+          <> "&until="
+          <> timestampToText options.until
+  res <- HTTP.httpBS $ makeReq url
+  pure $ HTTP.getResponseBody res
 
 parseResponse :: HTTP.Response ByteString -> (Aeson.Value -> Aeson.Types.Parser a) -> IO a
 parseResponse res parser = do
