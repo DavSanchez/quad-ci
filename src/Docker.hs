@@ -19,7 +19,8 @@ data Service = Service
     startContainer :: ContainerId -> IO (),
     containerStatus :: ContainerId -> IO ContainerStatus,
     createVolume :: IO Volume,
-    fetchLogs :: FetchLogsOptions -> IO ByteString
+    fetchLogs :: FetchLogsOptions -> IO ByteString,
+    pullImage :: Image -> IO()
   }
 
 data CreateContainerOptions = CreateContainerOptions
@@ -31,7 +32,7 @@ data CreateContainerOptions = CreateContainerOptions
 data ContainerStatus = ContainerRunning | ContainerExited ContainerExitCode | ContainerOther Text
   deriving (Eq, Show)
 
-newtype Image = Image Text deriving (Eq, Show)
+data Image = Image {name :: Text, tag :: Text} deriving (Eq, Show)
 
 newtype ContainerExitCode = ContainerExitCode Int deriving (Eq, Show)
 
@@ -51,8 +52,8 @@ containerIdToText (ContainerId c) = c
 exitCodeToInt :: ContainerExitCode -> Int
 exitCodeToInt (ContainerExitCode code) = code
 
-imageToText :: Docker.Image -> Text
-imageToText (Docker.Image image) = image
+imageToText :: Image -> Text
+imageToText image = image.name <> ":" <> image.tag
 
 createService :: IO Service
 createService = do
@@ -69,7 +70,8 @@ createService = do
         startContainer = startContainer' makeReq,
         containerStatus = containerStatus' makeReq,
         createVolume = createVolume' makeReq,
-        fetchLogs = fetchLogs' makeReq
+        fetchLogs = fetchLogs' makeReq,
+        pullImage = pullImage' makeReq
       }
 
 createContainer' :: RequestBuilder -> CreateContainerOptions -> IO ContainerId
@@ -141,6 +143,15 @@ fetchLogs' makeReq options = do
           <> timestampToText options.until
   res <- HTTP.httpBS $ makeReq url
   pure $ HTTP.getResponseBody res
+
+pullImage' :: RequestBuilder -> Image -> IO ()
+pullImage' makeReq image = do
+  let url = "/images/create?tag="
+          <> image.tag
+          <> "&fromImage="
+          <> image.name
+  let req = makeReq url & HTTP.setRequestMethod "POST"
+  void $ HTTP.httpBS  req
 
 parseResponse :: HTTP.Response ByteString -> (Aeson.Value -> Aeson.Types.Parser a) -> IO a
 parseResponse res parser = do
