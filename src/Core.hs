@@ -7,6 +7,7 @@ import qualified RIO.List as List
 import qualified RIO.Map as Map
 import qualified RIO.NonEmpty as NonEmpty
 import qualified RIO.Text as Text
+import qualified Data.Aeson as Aeson
 
 type LogCollection = Map StepName CollectionStatus
 
@@ -25,14 +26,14 @@ data Log = Log
 data Pipeline = Pipeline
   { steps :: NonEmpty Step
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Aeson.FromJSON)
 
 data Step = Step
   { name :: StepName,
     commands :: NonEmpty Text,
     image :: Docker.Image
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Aeson.FromJSON)
 
 data Build = Build
   { pipeline :: Pipeline,
@@ -68,7 +69,7 @@ data BuildResult
   | BuildUnexpectedState Text
   deriving (Eq, Show)
 
-newtype StepName = StepName Text deriving (Eq, Show, Ord)
+newtype StepName = StepName Text deriving (Eq, Show, Ord, Generic, Aeson.FromJSON)
 
 stepNameToText :: StepName -> Text
 stepNameToText (StepName step) = step
