@@ -1,5 +1,7 @@
 module Core where
 
+import qualified Codec.Serialise as Serialise
+import qualified Data.Aeson as Aeson
 import qualified Data.Time.Clock.POSIX as Time
 import qualified Docker
 import RIO
@@ -7,7 +9,8 @@ import qualified RIO.List as List
 import qualified RIO.Map as Map
 import qualified RIO.NonEmpty as NonEmpty
 import qualified RIO.Text as Text
-import qualified Data.Aeson as Aeson
+
+newtype BuildNumber = BuildNumber Int deriving (Eq, Show, Generic, Serialise.Serialise)
 
 type LogCollection = Map StepName CollectionStatus
 
@@ -21,19 +24,19 @@ data Log = Log
   { output :: ByteString,
     step :: StepName
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Serialise.Serialise)
 
 data Pipeline = Pipeline
   { steps :: NonEmpty Step
   }
-  deriving (Eq, Show, Generic, Aeson.FromJSON)
+  deriving (Eq, Show, Generic, Aeson.FromJSON, Serialise.Serialise)
 
 data Step = Step
   { name :: StepName,
     commands :: NonEmpty Text,
     image :: Docker.Image
   }
-  deriving (Eq, Show, Generic, Aeson.FromJSON)
+  deriving (Eq, Show, Generic, Aeson.FromJSON, Serialise.Serialise)
 
 data Build = Build
   { pipeline :: Pipeline,
@@ -41,21 +44,21 @@ data Build = Build
     completedSteps :: Map StepName StepResult,
     volume :: Docker.Volume
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Serialise.Serialise)
 
 data BuildState
   = BuildReady
   | BuildRunning BuildRunningState
   | BuildFinished BuildResult
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Serialise.Serialise)
 
 data BuildRunningState = BuildRunningState {step :: StepName, container :: Docker.ContainerId}
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Serialise.Serialise)
 
 data StepResult
   = StepFailed Docker.ContainerExitCode
   | StepSucceeded
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Serialise.Serialise)
 
 exitCodeToStepResult :: Docker.ContainerExitCode -> StepResult
 exitCodeToStepResult exit =
@@ -67,9 +70,12 @@ data BuildResult
   = BuildSucceeded
   | BuildFailed
   | BuildUnexpectedState Text
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Serialise.Serialise)
 
-newtype StepName = StepName Text deriving (Eq, Show, Ord, Generic, Aeson.FromJSON)
+newtype StepName = StepName Text deriving (Eq, Show, Ord, Generic, Aeson.FromJSON, Serialise.Serialise)
+
+buildNumberToInt :: BuildNumber -> Int
+buildNumberToInt (BuildNumber n) = n
 
 stepNameToText :: StepName -> Text
 stepNameToText (StepName step) = step

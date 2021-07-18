@@ -25,10 +25,10 @@ In which I implement a CI server by following The Simple Haskell Handbook.
   - [x] Testing Log collection
   - [x] Pulling images
   - [x] Parsing pipelines as yaml
-- [ ] Part II:
-  - [ ] Building the imperative shell
-  - [ ] Server and Agents
-  - [ ] Building the Agent
+- [-] Part II:
+  - [x] Building the imperative shell
+  - [x] Server and Agents
+  - [-] Building the Agent
   - [ ] Testing Server and Agents
   - [ ] Storing Builds in memory with STM
   - [ ] Sending updates from Agents back to the Server
