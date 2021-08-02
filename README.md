@@ -28,10 +28,10 @@ In which I implement a CI server by following The Simple Haskell Handbook.
 - [ ] Part II:
   - [x] Building the imperative shell
   - [x] Server and Agents
-  - [ ] Building the Agent
-  - [ ] Testing Server and Agents
-  - [ ] Storing Builds in memory with STM
-  - [ ] Sending updates from Agents back to the Server
+  - [x] Building the Agent
+  - [x] Testing Server and Agents
+  - [x] Storing Builds in memory with STM
+  - [x] Sending updates from Agents back to the Server
   - [ ] Triggering builds throught webhooks
   - [ ] Implementing the webhook endpoint
   - [ ] Building the API for the web UI

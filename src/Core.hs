@@ -10,7 +10,7 @@ import qualified RIO.Map as Map
 import qualified RIO.NonEmpty as NonEmpty
 import qualified RIO.Text as Text
 
-newtype BuildNumber = BuildNumber Int deriving (Eq, Show, Generic, Serialise.Serialise)
+newtype BuildNumber = BuildNumber Int deriving (Eq, Show, Generic, Serialise.Serialise, Ord)
 
 type LogCollection = Map StepName CollectionStatus
 
