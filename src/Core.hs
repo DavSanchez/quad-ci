@@ -175,3 +175,19 @@ runCollection docker collectUntil collection = do
         let options = Docker.FetchLogsOptions {container = container, since = since, until = collectUntil}
         output <- docker.fetchLogs options
         pure [Log {step = step, output = output}]
+
+stepStateToText :: Build -> Step -> Text
+stepStateToText build step =
+  case build.state of
+    BuildRunning s ->
+      if s.step == step.name
+        then "running"
+        else stepNotRunning
+    _ -> stepNotRunning
+  where
+    stepNotRunning = case Map.lookup step.name build.completedSteps of
+      Just StepSucceeded -> "succeeded"
+      Just (StepFailed _) -> "failed"
+      Nothing -> case build.state of
+        BuildFinished _ -> "skipped"
+        _ -> "ready"
