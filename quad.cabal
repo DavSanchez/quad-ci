@@ -13,6 +13,7 @@ library
       Agent
       Core
       Docker
+      GitHub
       JobHandler
       JobHandler.Memory
       Runner
