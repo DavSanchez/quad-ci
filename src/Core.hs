@@ -191,3 +191,6 @@ stepStateToText build step =
       Nothing -> case build.state of
         BuildFinished _ -> "skipped"
         _ -> "ready"
+
+displayBuildNumber :: BuildNumber -> String
+displayBuildNumber number = "#" <> show (buildNumberToInt number)
