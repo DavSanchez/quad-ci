@@ -58,33 +58,33 @@ testPipeline =
 testRunSuccess :: Runner.Service -> IO ()
 testRunSuccess runner = do
   build <-
-    runner.prepareBuild $
+    runner . prepareBuild $
       makePipeline
         [ makeStep "First step" "ubuntu" ["date"],
           makeStep "Second step" "ubuntu" ["uname -r"]
         ]
-  result <- runner.runBuild emptyHooks build
-  result.state `shouldBe` BuildFinished BuildSucceeded
-  Map.elems result.completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
+  result <- runner . runBuild emptyHooks build
+  result . state `shouldBe` BuildFinished BuildSucceeded
+  Map.elems result . completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
 
 testRunFailure :: Runner.Service -> IO ()
 testRunFailure runner = do
-  build <- runner.prepareBuild $ makePipeline [makeStep "Should fail" "ubuntu" ["exit 1"]]
-  result <- runner.runBuild emptyHooks build
-  result.state `shouldBe` BuildFinished BuildFailed
-  Map.elems result.completedSteps `shouldBe` [StepFailed (Docker.ContainerExitCode 1)]
+  build <- runner . prepareBuild $ makePipeline [makeStep "Should fail" "ubuntu" ["exit 1"]]
+  result <- runner . runBuild emptyHooks build
+  result . state `shouldBe` BuildFinished BuildFailed
+  Map.elems result . completedSteps `shouldBe` [StepFailed (Docker.ContainerExitCode 1)]
 
 testSharedWorkspace :: Runner.Service -> IO ()
 testSharedWorkspace runner = do
   build <-
-    runner.prepareBuild $
+    runner . prepareBuild $
       makePipeline
         [ makeStep "First step" "ubuntu" ["echo hello > test"],
           makeStep "Second step" "ubuntu" ["cat test"]
         ]
-  result <- runner.runBuild emptyHooks build
-  result.state `shouldBe` BuildFinished BuildSucceeded
-  Map.elems result.completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
+  result <- runner . runBuild emptyHooks build
+  result . state `shouldBe` BuildFinished BuildSucceeded
+  Map.elems result . completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
 
 testLogCollection :: Runner.Service -> IO ()
 testLogCollection runner = do
@@ -93,43 +93,51 @@ testLogCollection runner = do
       onLog log = do
         remaining <- readMVar expected
         forM_ remaining $ \word -> do
-          case ByteString.breakSubstring word log.output of
+          case ByteString.breakSubstring word log . output of
             (_, "") -> pure () -- Not found
             _ -> modifyMVar_ expected (pure . Set.delete word) -- string found
         pure ()
   let hooks = Runner.Hooks {logCollected = onLog, buildUpdated = \_ -> pure ()}
 
   build <-
-    runner.prepareBuild $
+    runner . prepareBuild $
       makePipeline
         [ makeStep "Long step" "ubuntu" ["echo hello", "sleep 2", "echo world"],
           makeStep "Echo linux" "ubuntu" ["uname -s"]
         ]
-  result <- runner.runBuild hooks build
-  result.state `shouldBe` BuildFinished BuildSucceeded
-  Map.elems result.completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
+  result <- runner . runBuild hooks build
+  result . state `shouldBe` BuildFinished BuildSucceeded
+  Map.elems result . completedSteps `shouldBe` [StepSucceeded, StepSucceeded]
   readMVar expected >>= \logs -> logs `shouldBe` Set.empty
 
 testImagePull :: Runner.Service -> IO ()
 testImagePull runner = do
   Process.readProcessStdout "docker rmi -f busybox"
-  build <- runner.prepareBuild $ makePipeline [makeStep "First step" "busybox" ["date"]]
-  result <- runner.runBuild emptyHooks build
-  result.state `shouldBe` BuildFinished BuildSucceeded
-  Map.elems result.completedSteps `shouldBe` [StepSucceeded]
+  build <- runner . prepareBuild $ makePipeline [makeStep "First step" "busybox" ["date"]]
+  result <- runner . runBuild emptyHooks build
+  result . state `shouldBe` BuildFinished BuildSucceeded
+  Map.elems result . completedSteps `shouldBe` [StepSucceeded]
 
 testYamlDecoding :: Runner.Service -> IO ()
 testYamlDecoding runner = do
   pipeline <- Yaml.decodeFileThrow "test/pipeline.sample.yml"
-  build <- runner.prepareBuild pipeline
-  result <- runner.runBuild emptyHooks build
-  result.state `shouldBe` BuildFinished BuildSucceeded
+  build <- runner . prepareBuild pipeline
+  result <- runner . runBuild emptyHooks build
+  result . state `shouldBe` BuildFinished BuildSucceeded
 
 testServerAndAgent :: Runner.Service -> IO ()
 testServerAndAgent =
   runServerAndAgent $ \handler -> do
     let pipeline = makePipeline [makeStep "agent-test" "busybox" ["echo hello", "echo from agent"]]
-    number <- handler.queueJob pipeline
+    let info =
+          JobHandler.CommitInfo
+            { sha = "00000",
+              branch = "master",
+              message = "test commit",
+              author = "quad",
+              repo = "quad-ci/quad"
+            }
+    number <- handler.queueJob info pipeline
     checkBuild handler number
 
 testWebhookTrigger :: Runner.Service -> IO ()
@@ -169,7 +177,7 @@ runServerAndAgent callback runner = do
 runBuild :: Docker.Service -> Build -> IO Build
 runBuild docker build = do
   newBuild <- Core.progress docker build
-  case newBuild.state of
+  case newBuild . state of
     BuildFinished _ -> pure newBuild
     _ -> do
       threadDelay (1 * 1000 * 1000)
@@ -206,10 +214,10 @@ checkBuild :: JobHandler.Service -> BuildNumber -> IO ()
 checkBuild handler number = loop
   where
     loop = do
-      Just job <- handler.findJob number
-      case job.state of
+      Just job <- handler . findJob number
+      case job . state of
         JobHandler.JobScheduled build -> do
-          case build.state of
+          case build . state of
             BuildFinished s -> s `shouldBe` BuildSucceeded
             _ -> loop
         _ -> loop

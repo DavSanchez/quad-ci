@@ -7,10 +7,10 @@ import qualified Data.Aeson as Aeson
 import qualified GitHub
 import qualified JobHandler
 import qualified Network.HTTP.Types as HTTP.Types
+import qualified Network.Wai.Middleware.Cors as Cors
 import RIO
 import qualified RIO.NonEmpty as NonEmpty
 import qualified Web.Scotty as Scotty
-import qualified Network.Wai.Middleware.Cors as Cors
 
 data Config = Config {port :: Int}
 
@@ -35,7 +35,7 @@ run config handler =
         pipeline <- GitHub.fetchRemotePipeline info
         let step = GitHub.createCloneStep info
 
-        handler.queueJob $
+        handler.queueJob info $
           pipeline
             { steps = NonEmpty.cons step pipeline.steps
             }
@@ -73,6 +73,7 @@ jobToJson number job =
   Aeson.object
     [ ("number", Aeson.toJSON $ Core.buildNumberToInt number),
       ("state", Aeson.toJSON $ jobStateToText job.state),
+      ("info", Aeson.toJSON job.info),
       ("steps", Aeson.toJSON steps)
     ]
   where
