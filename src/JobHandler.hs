@@ -16,7 +16,8 @@ data Service = Service
   { queueJob :: Pipeline -> IO BuildNumber,
     dispatchCmd :: IO (Maybe Agent.Cmd),
     processMsg :: Agent.Msg -> IO (),
-    findJob :: BuildNumber -> IO (Maybe Job)
+    findJob :: BuildNumber -> IO (Maybe Job),
+    fetchLogs :: BuildNumber -> StepName -> IO (Maybe ByteString)
   }
 
 data CommitInfo = CommitInfo

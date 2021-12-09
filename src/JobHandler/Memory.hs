@@ -34,7 +34,10 @@ createService = do
         dispatchCmd = STM.atomically do
           STM.stateTVar state dispatchCmd',
         processMsg = \msg -> STM.atomically do
-          STM.modifyTVar' state $ processMsg' msg
+          STM.modifyTVar' state $ processMsg' msg,
+        fetchLogs = \number step -> STM.atomically do
+          s <- STM.readTVar state
+          pure $ fetchLogs' number step s
       }
 
 queueJob' :: Pipeline -> State -> (BuildNumber, State)
@@ -71,7 +74,10 @@ processMsg' :: Agent.Msg -> State -> State
 processMsg' msg state = case msg of
   Agent.BuildUpdated number build ->
     let f job = job{state = JobHandler.JobScheduled build}
-    in state{jobs = Map.adjust f number state.jobs}
+     in state{jobs = Map.adjust f number state.jobs}
   Agent.LogCollected number log ->
     let updatedLogs = Map.insertWith (flip (<>)) (number, log.step) log.output state.logs
-    in state{logs = updatedLogs}
+     in state{logs = updatedLogs}
+
+fetchLogs' :: BuildNumber -> StepName -> State -> Maybe ByteString
+fetchLogs' number step state = Map.lookup (number, step) state.logs

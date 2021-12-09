@@ -2,6 +2,7 @@ module Server where
 
 import qualified Codec.Serialise as Serialise
 import Core
+import Core (BuildRunningState (step))
 import qualified Data.Aeson as Aeson
 import qualified GitHub
 import qualified JobHandler
@@ -51,6 +52,13 @@ run config handler =
           Just j -> pure j
 
       Scotty.json $ jobToJson number job
+
+    Scotty.get "/build/:number/step/:step/logs" do
+      number <- BuildNumber <$> Scotty.param "number"
+      step <- StepName <$> Scotty.param "step"
+
+      log <- Scotty.liftAndCatchIO $ handler.fetchLogs number step
+      Scotty.raw $ fromStrictBytes $ fromMaybe "" log
 
 jobToJson :: BuildNumber -> JobHandler.Job -> Aeson.Value
 jobToJson number job =
