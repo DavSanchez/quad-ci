@@ -10,12 +10,14 @@ import qualified Network.HTTP.Types as HTTP.Types
 import RIO
 import qualified RIO.NonEmpty as NonEmpty
 import qualified Web.Scotty as Scotty
+import qualified Network.Wai.Middleware.Cors as Cors
 
 data Config = Config {port :: Int}
 
 run :: Config -> JobHandler.Service -> IO ()
 run config handler =
   Scotty.scotty config.port do
+    Scotty.middleware Cors.simpleCors
     Scotty.post "/agent/pull" do
       cmd <- Scotty.liftAndCatchIO $ handler.dispatchCmd
       Scotty.raw $ Serialise.serialise cmd
@@ -59,6 +61,12 @@ run config handler =
 
       log <- Scotty.liftAndCatchIO $ handler.fetchLogs number step
       Scotty.raw $ fromStrictBytes $ fromMaybe "" log
+
+    Scotty.get "/build" do
+      jobs <- Scotty.liftAndCatchIO do
+        handler.latestJobs
+
+      Scotty.json $ jobs <&> \(number, job) -> jobToJson number job
 
 jobToJson :: BuildNumber -> JobHandler.Job -> Aeson.Value
 jobToJson number job =
